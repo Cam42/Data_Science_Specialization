@@ -6,15 +6,15 @@
 
 # start by combining the feature data
 data_train_X <- './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/train/X_train.txt'
-train_X <- read.table(data_train_X)
+train_X <- read.table(data_train_X, colClasses='numeric')
 subject_train <- './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/train/subject_train.txt'
-train_sub  <- read.table(subject_train)
+train_sub  <- read.table(subject_train, colClasses='integer')
 subject_list <- as.list( train_sub[,'V1'])
 
 data_test_X <- './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/test/X_test.txt'
-test_X <- read.table(data_test_X)
+test_X <- read.table(data_test_X, colClasses='numeric')
 subject_test <- './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/test/subject_test.txt'
-test_sub <- read.table(subject_test)
+test_sub <- read.table(subject_test, colClasses='integer')
 subject_list <- c(subject_list, as.list(test_sub[,'V1']))
 
 data_X <- rbind(train_X, test_X)
@@ -59,6 +59,7 @@ all_data <- all_data[, c(length(colnames(all_data)) - 1,
 # Used to add all means of datapoints with the same subject and activity
 mean_categories = data.frame(matrix(ncol = length(colnames(all_data)), 
                                     nrow=0) )
+
 # goes through every subject
 for (subject_n in sort(unique(all_data$subject))) {
     # goes through every activity
@@ -75,6 +76,8 @@ for (subject_n in sort(unique(all_data$subject))) {
 }
 # for correct columns
 colnames(mean_categories) <- colnames(all_data)
+mean_categories[, 1] <- as.integer(mean_categories[, 1])
+columns_total <- length(colnames(mean_categories))
+mean_categories[, 3:columns_total] <- lapply(mean_categories[, 3:columns_total], as.numeric)
 # columns are categories.  1 row of values is mean over for 1 subject + activity
 write.table(mean_categories, 'run_analysis.txt', row.names=FALSE)
-
