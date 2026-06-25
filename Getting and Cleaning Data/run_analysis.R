@@ -1,26 +1,36 @@
 # Uses the datasets from 'https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip'
-# Combines the training and testing datasets into 1.  Then uses them to fine the
-# mean of all features in X accross the training and testing datasets.  Only
-# done for features that are the mean or standard deviation of people.
+# Combines the training and testing datasets into 1.  Then uses them to find the
+# mean of all unique activity and subject combination in X across the training
+# and testing datasets.  Only done for features that are the mean or standard
+# deviation of people.
 
 # start by combining the feature data
-data_train_X = './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/train/X_train.txt'
+data_train_X <- './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/train/X_train.txt'
 train_X <- read.table(data_train_X)
-data_test_X = './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/test/X_test.txt'
+subject_train <- './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/train/subject_train.txt'
+train_sub  <- read.table(subject_train)
+subject_list <- as.list( train_sub[,'V1'])
+
+data_test_X <- './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/test/X_test.txt'
 test_X <- read.table(data_test_X)
+subject_test <- './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/test/subject_test.txt'
+test_sub <- read.table(subject_test)
+subject_list <- c(subject_list, as.list(test_sub[,'V1']))
+
 data_X <- rbind(train_X, test_X)
 # get names of features for X data
 feat_names = './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/features.txt'
 col_names_X <- read.table(feat_names)
 # remove 1st row which has list number of features
 col_names_X <- col_names_X[, 2]
-# gets name of all columns that are a mean or std
+# gets name of all columns that are a mean, std, or subject
 mean_std_names <- grepl('mean()', col_names_X, fixed=TRUE) | 
     grepl('std()', col_names_X, fixed=TRUE)
 # renames columns to descriptive names
 colnames(data_X) <- col_names_X
 # remove unwanted rows from data_X
 data_X <- data_X[, mean_std_names]
+data_X['subject'] <- unlist(subject_list)
 
 data_train_y = './getdata_projectfiles_UCI HAR Dataset/UCI HAR Dataset/train/y_train.txt'
 train_y <- read.table(data_train_y)
@@ -39,30 +49,32 @@ all_data <- data_X
 # final dataframe wanted
 all_data$activity <-named_y$V2
 
-# Used to add all feature activity combination means to later dataframe.
-all_means <- list()
-combined_categories <- list()
-# goes through every feature
-for (act_name in named_data_y$V2) {
-
-    # get only data with activity being done and remove activity
-    temp_table <- subset(all_data[all_data$activity == act_name, ],
-                         select = -activity)
-    # turning column names to activity + data type combination 
-    colnames(temp_table) <- gsub('-', '_',
-                                paste(colnames(temp_table), act_name, sep = '-'))
-    # gsub used to remove characters which turn into '.' in write.table
-    colnames(temp_table) <- gsub("(", '', gsub('-', '_', colnames(temp_table)), fixed=TRUE)
-    colnames(temp_table) <- gsub(")", '', colnames(temp_table), fixed=TRUE)
-    for (col_n in colnames(temp_table)) {
-        combined_categories[[length(combined_categories) + 1]] <- col_n
-    }
-    for (numb in colMeans(temp_table)) {
-        all_means[[length(all_means) + 1]] <- as.numeric(numb)
+# gsub used to remove column characters which turn into '.' in write.table
+colnames(all_data) <- gsub("(", '', gsub('-', '_', colnames(all_data)), fixed=TRUE)
+colnames(all_data) <- gsub(")", '', colnames(all_data), fixed=TRUE)
+# have sugject and activity as the first columns for readability
+all_data <- all_data[, c(length(colnames(all_data)) - 1,
+                         length(colnames(all_data)),
+                        1:(length(colnames(all_data)) - 2))]
+# Used to add all means of datapoints with the same subject and activity
+mean_categories = data.frame(matrix(ncol = length(colnames(all_data)), 
+                                    nrow=0) )
+# goes through every subject
+for (subject_n in sort(unique(all_data$subject))) {
+    # goes through every activity
+    for (act_name in sort(named_data_y$V2)) {
+    
+        # get only mean/std data with wanted activity + subject
+        # remove activity + subject as not needed for mean
+        temp_table <- subset(all_data[(all_data$activity == act_name) &
+                                      (all_data$subject == subject_n), ],
+                             select = -c(subject, activity))
+        mean_categories <- rbind(mean_categories,
+                                 c(subject_n, act_name, colMeans(temp_table)))
     }
 }
-# columns are categories + activity.  1 row of values is mean over all subjects
-mean_categories <- as.data.frame(all_means, col.names = combined_categories)
-
+# for correct columns
+colnames(mean_categories) <- colnames(all_data)
+# columns are categories.  1 row of values is mean over for 1 subject + activity
 write.table(mean_categories, 'run_analysis.txt', row.names=FALSE)
 
